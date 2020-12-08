@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2020/4/8 09:12
-# @Author  : Ziheng
+# @Author  : Aurora
 # @File    : run_example.py
-# @Function: example of GNN for link prediction
+# @Function: example of GNN for recommendation
 
 import argparse
 import os
@@ -25,7 +25,6 @@ from model.L1neighs_Aggregator import L1neighs_Aggregator
 from model.L2neighs_Aggregator import L2neighs_Aggregator
 from model.Encoder import Encoder
 from model.GATrec import GATrec
-from model.utils import get_ap_feature, load_embedding
 
 def train(model, train_loader, optimizer, epoch, best_auc, best_acc, device):
     model.train()
@@ -38,7 +37,7 @@ def train(model, train_loader, optimizer, epoch, best_auc, best_acc, device):
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
-        if i % 100 == 0 and i != 0:
+        if i % 100 == 0:
             print('[%d, %5d] loss: %.3f, The best auc/acc: %.6f / %.6f' % (
                 epoch, i, running_loss / 100, best_auc, best_acc))
             running_loss = 0.0
@@ -74,11 +73,13 @@ def test(model, device, test_loader):
     auc_value = auc(fpr, tpr)
 
     acc_value = accuracy_score(target, acc_pred)
-
+    # print("-----sklearn:",auc(fpr, tpr))
+    # expected_rmse = sqrt(mean_squared_error(tmp_pred, target))
+    # mae = mean_absolute_error(tmp_pred, target)
     return auc_value, acc_value
 
 def main():
-    parser = argparse.ArgumentParser(description='ZihengGNN')
+    parser = argparse.ArgumentParser(description='weihaoGNN')
     parser.add_argument('-bs', '--batch_size', type=int, default=128, help='input batch size for training')
     parser.add_argument('-ed', '--embed_dim', type=int, default=128, help='embedding size')
     parser.add_argument('-lr', '--lr', type=float, default=0.0001, help='learning rate')
@@ -107,6 +108,7 @@ def main():
     print('#### Ziheng Aminer ####\n')
     print('parameter:\n{}'.format(args.__dict__))
 
+    # train_uv, test_uv, train_rating, test_rating = data_loader_new.get_train_test(path_ratings, 0.2)
     train_uv, test_uv, train_label, test_label = data_loader_new.get_train_test_withcount()
 
     # test_uv = train_uv
@@ -125,10 +127,22 @@ def main():
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size, shuffle=True)
 
-    # load doc2embedding for subsequent training
-    a_f = get_ap_feature("./link_pred_data/origin_data/author_vectors_300.txt")
-    p_f = get_ap_feature("./link_pred_data/origin_data/paper_vectors_300.txt")
-    all_embeddings = a_f+p_f
+    # initialize embedding for subsequent training
+    # u2e = nn.Embedding(num_users, embed_dim).to(device)
+    # v2e = nn.Embedding(num_movies, embed_dim).to(device)
+    # r2e = nn.Embedding(num_ratings, embed_dim).to(device)
+
+    # initialzie attribute embedding to distinguish different attributes
+    # va2e, ua2e would never change in training process
+    # ua2e = nn.Embedding(num_user_attr, embed_dim).to(device)
+    # va2e = nn.Embedding(num_genres, embed_dim).to(device)
+
+    # u2e.weight.requires_grad=False
+    # v2e.weight.requires_grad=False
+    # r2e.weight.requires_grad=False
+
+    # ua2e.weight.requires_grad=False
+    # va2e.weight.requires_grad=False
 
     # u_L1Aggregator = L1neighs_Aggregator(u2e, v2e, r2e, ua2e, va2e, embed_dim, cuda=device, uv=True)
     # v_L1Aggregator = L1neighs_Aggregator(u2e, v2e, r2e, ua2e, va2e, embed_dim, cuda=device, uv=False)
@@ -137,8 +151,9 @@ def main():
 
     # u_Encoder = Encoder(u2e, embed_dim, uL1paths, uL2paths, ua_list, va_list, u_L1Aggregator, u_L2Aggregator, cuda=device, uv=True)
     # v_Encoder = Encoder(v2e, embed_dim, vL1paths, vL2paths, ua_list, va_list, v_L1Aggregator, v_L2Aggregator, cuda=device, uv=False)
+    Rec_Encoder = Encoder()
 
-    gatRec = GATrec(None, embed_dim).to(device)
+    gatRec = GATrec(Rec_Encoder, embed_dim).to(device)
     # optimizer = torch.optim.RMSprop(gatRec.parameters(), lr=lr, alpha=0.99)
     optimizer = torch.optim.Adam(gatRec.parameters(), lr=lr)
 
